@@ -4,6 +4,7 @@ import java.net.*;
 import java.nio.file.*;
 import java.util.*;
 import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
 import javax.crypto.*;
@@ -83,10 +84,12 @@ public class Server {
 		// --------------------------------//
 
 		String filePathToPublicKey = "disk/server/publicKey.pub" ;
+		String filePathToPrivateKey = "disk/server/privateKey.key";
 		// --------------------------------//
 		String msg_end = "bye";
 		int nbr_msg = 0;
 		String msg_init_session = "HELLO";
+		int key_DES;
 		// --------------------------------//
 		try {
 			serverSocket = new ServerSocket(1254);
@@ -99,23 +102,33 @@ public class Server {
 			do {			
 				dataInputStream = new DataInputStream(socketClient.getInputStream());
 				messageFromClient = new String (dataInputStream.readUTF());
-				System.out.println("client : " + messageFromClient);
+				System.out.println("CLIENT : " + messageFromClient);
 				//int key = 0b1010000010;
 				//System.out.println("client : " + SDES.decrypt(messageFromClient, SDES.getK1(key),SDES.getK2(key)));
 				
 				if(messageFromClient.equals(msg_init_session)){
 					System.out.println("[... envoie de ma clé publique ...]");
-					// Path pathpub = Paths.get("disk/server/publicKey.pub.pem");
-					//byte[] bytespub = read("disk/server/publicKey.pub.pem");
-					// byte[] bytespub = Files.readAllBytes(pathpub);
-					// /* Generate public key. */
-					// X509EncodedKeySpec kspub = new X509EncodedKeySpec(read( filePathToPublicKey ));
-					// KeyFactory kfpub = KeyFactory.getInstance("RSA");
-					// PublicKey pubRead = kfpub.generatePublic(kspub);
-					// System.out.println(pubRead);
 					messageToClient = readFile( filePathToPublicKey );
 				}else if(nbr_msg == 1){
+					/* Read private key. */
+					Path path = Paths.get(filePathToPrivateKey);
+					byte[] bytes = Files.readAllBytes(path);
+					
+					/* Generate private key. */
+					PKCS8EncodedKeySpec ks = new PKCS8EncodedKeySpec(bytes);
+					KeyFactory kf = KeyFactory.getInstance("RSA");
+					PrivateKey pvtRead = kf.generatePrivate(ks);
+
+					byte[] message = Base64.getDecoder().decode(messageFromClient);
+					
+					byte[] recovered_message = decrypt(pvtRead,message);
+					String key_DES_str = new String(recovered_message, "UTF8");
+					key_DES = Integer.parseInt(key_DES_str,2);
+		
 					System.out.println("[... clé secrète chiffré reçu ...]");
+					System.out.println("key_DES        : " + " [ "+ key_DES_str +" ]  "+  key_DES);
+
+					System.out.println("[... envoie de l'acquitement...]");
 					messageToClient = "clé secrète chiffré reçu";
 
 				}else{

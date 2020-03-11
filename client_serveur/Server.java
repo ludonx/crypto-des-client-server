@@ -100,15 +100,25 @@ public class Server {
 			dataOutputStream = new DataOutputStream(socketClient.getOutputStream());
 			dataOutputStream.writeUTF("Hi There");
 			do {			
-				dataInputStream = new DataInputStream(socketClient.getInputStream());
-				messageFromClient = new String (dataInputStream.readUTF());
-				System.out.println("CLIENT : " + messageFromClient);
+				if(nbr_msg == 0 || nbr_msg == 1){
+					dataInputStream = new DataInputStream(socketClient.getInputStream());
+					messageFromClient = new String (dataInputStream.readUTF());
+					System.out.println("CLIENT : " + messageFromClient);
+				}else{ // a partir d'ici on crypte tout
+					dataInputStream = new DataInputStream(socketClient.getInputStream());
+					messageFromClient = new String (dataInputStream.readUTF());
+					System.out.println("CLIENT : " + messageFromClient);
+				}
 				//int key = 0b1010000010;
 				//System.out.println("client : " + SDES.decrypt(messageFromClient, SDES.getK1(key),SDES.getK2(key)));
 				
 				if(messageFromClient.equals(msg_init_session)){
 					System.out.println("[... envoie de ma clé publique ...]");
 					messageToClient = readFile( filePathToPublicKey );
+
+					dataOutputStream.writeUTF(messageToClient);
+					dataOutputStream.flush();
+					nbr_msg = nbr_msg + 1;
 				}else if(nbr_msg == 1){
 					/* Read private key. */
 					Path path = Paths.get(filePathToPrivateKey);
@@ -131,14 +141,20 @@ public class Server {
 					System.out.println("[... envoie de l'acquitement...]");
 					messageToClient = "clé secrète chiffré reçu";
 
+					dataOutputStream.writeUTF(messageToClient);
+					dataOutputStream.flush();
+					nbr_msg = nbr_msg + 1;
+
 				}else{
 					System.out.print("> ");
 					scanner = new Scanner(System.in);
 					messageToClient = scanner.nextLine();
+
+					dataOutputStream.writeUTF(messageToClient);
+					dataOutputStream.flush();
+					nbr_msg = nbr_msg + 1;
 				}
-				dataOutputStream.writeUTF(messageToClient);
-				dataOutputStream.flush();
-				nbr_msg = nbr_msg + 1;
+				
 				
 			//} while(!messageToClient.equals(msg_end));//close when server said bye
 			} while(!messageFromClient.equals(msg_end));//close when client said bye

@@ -58,10 +58,15 @@ public class Client {
 				if(nbr_msg == 0){
 					dataInputStream = new DataInputStream(socketClient.getInputStream());
 					messageFromServer = new String (dataInputStream.readUTF());
-					System.out.println("server : " + messageFromServer);
+					System.out.println("SERVER : " + messageFromServer);
 
 					System.out.println("[... envoie du message["+msg_init_session+"] de debut de session ...]");
 					messageToServer = msg_init_session;
+
+					dataOutputStream = new DataOutputStream(socketClient.getOutputStream());
+					dataOutputStream.writeUTF(messageToServer);
+					dataOutputStream.flush();
+					nbr_msg = nbr_msg + 1;
 				}else if(nbr_msg == 1){
 					dataInputStream = new DataInputStream(socketClient.getInputStream());
 					messageFromServer = new String (dataInputStream.readUTF());
@@ -118,19 +123,26 @@ public class Client {
 					//messageToServer = SDES.encrypt(msg, SDES.getK1(key),SDES.getK2(key));
 					messageToServer = msg;
 
+					dataOutputStream = new DataOutputStream(socketClient.getOutputStream());
+					dataOutputStream.writeUTF(messageToServer);
+					dataOutputStream.flush();
+					nbr_msg = nbr_msg + 1;
+
 				}else{
 					dataInputStream = new DataInputStream(socketClient.getInputStream());
 					messageFromServer = new String (dataInputStream.readUTF());
-					System.out.println("server : " + messageFromServer);
+					System.out.println("SERVER : " + messageFromServer);
 					System.out.print("> ");
 					scanner = new Scanner(System.in);
 					messageToServer = scanner.nextLine();
+
+					dataOutputStream = new DataOutputStream(socketClient.getOutputStream());
+					dataOutputStream.writeUTF(messageToServer);
+					dataOutputStream.flush();
+					nbr_msg = nbr_msg + 1;
 				}
 				
-				dataOutputStream = new DataOutputStream(socketClient.getOutputStream());
-				dataOutputStream.writeUTF(messageToServer);
-				dataOutputStream.flush();
-				nbr_msg = nbr_msg + 1;
+				
 			//} while(!messageFromServer.equals(msg_end)); // stop when server said bye
 			} while(!messageToServer.equals(msg_end)); // stop when client said bye
 		

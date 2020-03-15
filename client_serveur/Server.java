@@ -10,7 +10,7 @@ import java.security.spec.X509EncodedKeySpec;
 import javax.crypto.*;
 
 public class Server {
-	// RSA encrypt/decrypt
+	// RSA encrypt/decrypt : les fonctions pour le chiffrement /dechiffrement en RSA 
 	//--------------------------------------------------------------------//
 	static byte[] encrypt(PublicKey key, byte[] plaintext) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException
 	{
@@ -26,18 +26,17 @@ public class Server {
 	    return cipher.doFinal(ciphertext);
 	}
 
+	// RSA generateAndSavePairKey : génération des clés publique et privé 
 	//--------------------------------------------------------------------//
-
 	public static void generateAndSavePairKey(String outpubFile, String outpvtFile) throws Exception {
-		//---------------1. Generating a Key Pair
+		//---------------1. Génération du couple de clés
 		KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
 	    kpg.initialize(2048);
 	    KeyPair kp = kpg.generateKeyPair();
 	    Key pub = kp.getPublic();
 	    Key pvt = kp.getPrivate();
 		
-		//---------------2. Saving the Keys in Binary Format
-		
+		//---------------2. Sauvegarde du couple de clés au format binaire
 		// FileOutputStream outpub = new FileOutputStream(outpubFile);
 		// outpub.write(pub.getEncoded());
 		// //outpub.write(Base64.getEncoder().encode(pub.getEncoded()));
@@ -47,7 +46,7 @@ public class Server {
 		outpvt.write(pvt.getEncoded());
 		outpvt.close();
 
-		//---------------3. Saving the Keys in Text Format
+		//---------------2. Sauvegarde du couple de clés au format text afin de facilité l'envoie par la socket
 		Base64.Encoder encoder = Base64.getEncoder();
  
 		//String outFile =  +".txt";
@@ -72,6 +71,7 @@ public class Server {
 		String outpubFile ="disk/server/publicKey.pub" ;
 		String outpvtFile = "disk/server/privateKey.key";
 		generateAndSavePairKey(outpubFile,outpvtFile);
+	
 		// --------------------------------//
 
 		DataOutputStream dataOutputStream = null;
@@ -80,39 +80,54 @@ public class Server {
 		ServerSocket serverSocket = null;
 		Socket socketClient = null;
 		Scanner scanner = null;
+		int port_con = 1254;
 
 		// --------------------------------//
-
 		String filePathToPublicKey = "disk/server/publicKey.pub" ;
 		String filePathToPrivateKey = "disk/server/privateKey.key";
+		
 		// --------------------------------//
 		String msg_end = "bye";
-		int nbr_msg = 0;
 		String msg_init_session = "HELLO";
-		int key_DES;
+		int nbr_msg = 0;
+		//int key_SDES = 0;
+		String key_DES = "0000000000000000";
 		// --------------------------------//
 		try {
-			serverSocket = new ServerSocket(1254);
+			// message pour initaliser la connection
+			serverSocket = new ServerSocket(port_con);
 			System.out.println("Server is running...");
 			socketClient = serverSocket.accept();
 			String messageFromClient;
 			String messageToClient;
 			dataOutputStream = new DataOutputStream(socketClient.getOutputStream());
 			dataOutputStream.writeUTF("Hi There");
-			do {			
+
+			do {		
+				// les deux 1er messages ne sont pas crypter
 				if(nbr_msg == 0 || nbr_msg == 1){
 					dataInputStream = new DataInputStream(socketClient.getInputStream());
 					messageFromClient = new String (dataInputStream.readUTF());
 					System.out.println("CLIENT : " + messageFromClient);
-				}else{ // a partir d'ici on crypte tout
+				}else{ 
+				// a partir d'ici tous les messages sont crypté donc on appliquer DES pour decrypter
 					dataInputStream = new DataInputStream(socketClient.getInputStream());
 					messageFromClient = new String (dataInputStream.readUTF());
+					
+					//----- Affichage du message du serveur -------//
 					System.out.println("CLIENT : " + messageFromClient);
+					// #SDES
+					//System.out.println("client SDES: "+ SDES.decrypt(messageFromClient, SDES.getK1(key_SDES),SDES.getK2(key_SDES)));
+					// #DES
+					System.out.println("client DES: "+ DES.decrypt(messageFromClient, key_DES));
+					//----- -------------------------------- -------//
+
 				}
-				//int key = 0b1010000010;
-				//System.out.println("client : " + SDES.decrypt(messageFromClient, SDES.getK1(key),SDES.getK2(key)));
+
 				
 				if(messageFromClient.equals(msg_init_session)){
+					// à la reception du message d'initialisation
+					// on envoie la clé publique au client 
 					System.out.println("[... envoie de ma clé publique ...]");
 					messageToClient = readFile( filePathToPublicKey );
 
@@ -120,6 +135,9 @@ public class Server {
 					dataOutputStream.flush();
 					nbr_msg = nbr_msg + 1;
 				}else if(nbr_msg == 1){
+					// à la reception du 2eme message ( la clé DES chiffré avec RSA)
+					// on dechiffre le message en utilisant la clès privé du serveur
+
 					/* Read private key. */
 					Path path = Paths.get(filePathToPrivateKey);
 					byte[] bytes = Files.readAllBytes(path);
@@ -132,23 +150,37 @@ public class Server {
 					byte[] message = Base64.getDecoder().decode(messageFromClient);
 					
 					byte[] recovered_message = decrypt(pvtRead,message);
-					String key_DES_str = new String(recovered_message, "UTF8");
-					key_DES = Integer.parseInt(key_DES_str,2);
+					// #SDES
+					//String key_SDES_str = new String(recovered_message, "UTF8");
+					//key_SDES = Integer.parseInt(key_SDES_str,2);
+					// #DES
+					key_DES = new String(recovered_message, "UTF8");
 		
 					System.out.println("[... clé secrète chiffré reçu ...]");
-					System.out.println("key_DES        : " + " [ "+ key_DES_str +" ]  "+  key_DES);
+					//System.out.println("key_SDES        : " + " [ "+ key_SDES_str +" ]  "+  key_SDES);
+					System.out.println("key_DES        : " + " [ "+ key_DES +" ]  ");
 
 					System.out.println("[... envoie de l'acquitement...]");
 					messageToClient = "clé secrète chiffré reçu";
-
+					// #SDES
+					//messageToClient = SDES.encrypt(messageToClient, SDES.getK1(key_SDES),SDES.getK2(key_SDES));
+					// #DES
+					messageToClient = DES.encrypt(messageToClient, key_DES);
+					
 					dataOutputStream.writeUTF(messageToClient);
 					dataOutputStream.flush();
 					nbr_msg = nbr_msg + 1;
 
 				}else{
+					// si on est dans cette partie, tous les message doivent être crypter avec DES avant d'être envoyer
 					System.out.print("> ");
 					scanner = new Scanner(System.in);
 					messageToClient = scanner.nextLine();
+					// #SDES
+					//messageToClient = SDES.encrypt(messageToClient, SDES.getK1(key_SDES),SDES.getK2(key_SDES));
+
+					// #DES
+					messageToClient = DES.encrypt(messageToClient, key_DES);
 
 					dataOutputStream.writeUTF(messageToClient);
 					dataOutputStream.flush();
@@ -180,13 +212,7 @@ public class Server {
 		}
 	}
 
-	private static byte[] read(String path) {
-        try {
-            return Base64.getDecoder().decode(Files.readAllBytes(new File(path).toPath()));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to read data from file: " + path, e);
-        }
-    }   
+	
 	private static String readFile(String filePath) 
     {
         String content = "";
